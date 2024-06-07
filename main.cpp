@@ -1,7 +1,7 @@
-#include<iostream>
-#include<string>
-#include<fstream>
-#include<bitset>
+#include <bitset>
+#include <fstream>
+#include <iostream>
+#include <string>
 
 using namespace std;
 
@@ -11,10 +11,12 @@ is a hash function that uses only multiplications and additions
 
 Hash(s) = ( s[0] + s[1]*p + s[2]*p^2 + ... ) % m
 */
-unsigned long polynomial_hash(string s, long long p, long long m) {
-    unsigned long hash = 0;
+unsigned long long polynomial_hash(const string &s, long long p, long long m)
+{
+    unsigned long long hash = 0;
     long long p_pow = 1;
-    for (char c : s) {
+    for (char c : s)
+    {
         hash = (hash + (c - 'a' + 1) * p_pow) % m;
         p_pow = (p_pow * p) % m;
     }
@@ -23,18 +25,20 @@ unsigned long polynomial_hash(string s, long long p, long long m) {
 
 /*
 DJB2
-this algorithm (k=33) was first reported by dan bernstein many years ago in comp.lang.c. 
-another version of this algorithm (now favored by bernstein) uses xor: 
+This algorithm (k=33) was first reported by Dan Bernstein many years ago in comp.lang.c. 
+Another version of this algorithm (now favored by Bernstein) uses XOR: 
 
 hash(i) = hash(i - 1) * 33 ^ str[i]; 
 
-the magic of number 33 (why it works better than many other constants, prime or not) has never been adequately explained. 
+The magic of number 33 (why it works better than many other constants, prime or not) has never been adequately explained. 
 */
 
-unsigned long dbj2(string s){
-    unsigned long hash = 5381;
-    for (char c : s) {
-        hash = ((hash << 5) + hash) + c;
+unsigned long long djb2(const string &s)
+{
+    unsigned long long hash = 5381;
+    for (char c : s)
+    {
+        hash = ((hash << 5) + hash) + c;  // hash * 33 + c
     }
     return hash;
 }
@@ -51,85 +55,108 @@ The actual function (pseudo code) is:
         hash(i) = hash(i - 1) * 65599 + str[i];
 */
 
-unsigned long sdbm(string s){
-    unsigned long hash = 0;
-    for (char c : s) {
+unsigned long long sdbm(const string &s)
+{
+    unsigned long long hash = 0;
+    for (char c : s)
+    {
         hash = c + (hash << 6) + (hash << 16) - hash;
     }
     return hash;
 }
 
-class BloomFilter {
-    private:
-        long long p = 31;
-        long long m = 10e9 + 1;
-        long long size;
-        string filename;
-    public:
-        bitset<10^9 + 1> bits(0);
-        BloomFilter(string filename){
-            this->size = 0;
-            cout << bits.to_string() << endl;
-            cout << "--- Initializing BloomFilter ---"<< endl;
-            getchar();
-            ifstream file(filename);
-            if(file.is_open()){
-                string line;
-                while(getline(file, line)){
-                    cout << "Added " << line << endl;
-                    add(line);
-                    size++;
-                }
-                file.close();
+class BloomFilter
+{
+private:
+    long long p = 31;
+    long long m = 1e9 + 9;  // Using 1e9 + 9 for practical purposes
+    long long size;
+    string filename;
+    bitset<1000001> bits;  // Correctly sized bitset
+
+public:
+    BloomFilter(string filename) : size(0), filename(filename), bits(0)
+    {
+        cout << "--- Initializing BloomFilter ---" << endl;
+        ifstream file(filename);
+        if (file.is_open())
+        {
+            string line;
+            while (getline(file, line))
+            {
+                cout << "Added " << line << endl;
+                add(line);
+                size++;
             }
-
-            cout << "--- BloomFilter Initialized ---" << endl;
-            cout << "Total Rows Added: " << size << endl;
-            cout << "Total Size " << sizeof(bits) << endl;
+            file.close();
+        }
+        else
+        {
+            cerr << "Unable to open file: " << filename << endl;
         }
 
-        void add(string s){
-            long long hash = polynomial_hash(s, p, m);
-            long long hash2 = dbj2(s);
-            long long hash3 = sdbm(s);
-            bits.set(hash);
-            bits.set(hash2);
-            bits.set(hash3);
-        }
+        cout << "--- BloomFilter Initialized ---" << endl;
+        cout << "Total Rows Added: " << size << endl;
+        cout << "Total Size: " << bits.size() << " bits" << endl;
+    }
 
-        bool contains(string s){
-            long long hash = polynomial_hash(s, p, m);
-            long long hash2 = dbj2(s);
-            long long hash3 = sdbm(s);
+    void add(const string &s)
+    {
+        auto hash = polynomial_hash(s, p, m);
+        auto hash2 = djb2(s) % m;
+        auto hash3 = sdbm(s) % m;
+        bits.set(hash % bits.size());
+        bits.set(hash2 % bits.size());
+        bits.set(hash3 % bits.size());
+    }
 
-            return bits.test(hash) && bits.test(hash2) && bits.test(hash3);
-        }
+    bool contains(const string &s)
+    {
+        auto hash = polynomial_hash(s, p, m);
+        auto hash2 = djb2(s) % m;
+        auto hash3 = sdbm(s) % m;
 
-        void test(string filename){
-            int positives = 0;
-            int negatives = 0;
-            ifstream file(filename);
-            if(file.is_open()){
-                string line;
-                while(getline(file, line)){
-                    cout << "Checking " << line << " : " << contains(line) << endl;
-                    positives += contains(line);
-                    negatives += !contains(line);
-                }
+        return bits.test(hash % bits.size()) && bits.test(hash2 % bits.size()) && bits.test(hash3 % bits.size());
+    }
 
-                cout << "Total Positives: " << positives << endl;
-                cout << "Total Negatives: " << negatives << endl;
-                file.close();
+    void test(const string &filename)
+    {
+        int positives = 0;
+        int negatives = 0;
+        ifstream file(filename);
+        if (file.is_open())
+        {
+            string line;
+            while (getline(file, line))
+            {
+                cout << "Checking " << line << " : " << contains(line) << endl;
+                positives += contains(line);
+                negatives += !contains(line);
             }
+            file.close();
         }
+        else
+        {
+            cerr << "Unable to open file: " << filename << endl;
+        }
+
+        cout << "Total Positives: " << positives << endl;
+        cout << "Total Negatives: " << negatives << endl;
+    }
+
+    bitset<1000001> get_bits()
+    {
+      return bits;
+    }
 };
 
-int main(){
+int main()
+{
     BloomFilter bf("malicious.csv");
     bf.test("malicious.csv");
     getchar();
     bf.test("benign.csv");
 
-    cout << bf.bits.all() << endl;
+    cout << "All bits set: " << bf.get_bits().all() << endl;
+    return 0;
 }
-
